@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<!--
+  WalkyTalky web UI.
+
+  Map layer uses Leaflet + OpenStreetMap tiles (no API key required), which
+  matches the OSM/Nominatim/OSRM stack the backend already uses. To switch to
+  Google Maps instead, replace the Leaflet tile layer with the Google Maps
+  JavaScript API (requires a billing-enabled API key).
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WalkyTalky — historical sites along your route</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, Segoe UI, Roboto, sans-serif; color: #1c2530; }
+    header { background: #0f3d5c; color: #fff; padding: 12px 18px; }
+    header h1 { margin: 0; font-size: 19px; }
+    header p { margin: 2px 0 0; font-size: 12px; opacity: .8; }
+    .layout { display: flex; height: calc(100vh - 58px); }
+    .panel { width: 380px; min-width: 320px; padding: 16px; overflow-y: auto; border-right: 1px solid #e2e8f0; }
+    #map { flex: 1; }
+    label { display: block; font-size: 12px; font-weight: 600; margin: 10px 0 3px; color: #475569; }
+    input, select { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+    .row { display: flex; gap: 8px; }
+    .row > div { flex: 1; }
+    button { margin-top: 14px; width: 100%; padding: 10px; background: #0f3d5c; color: #fff;
+             border: 0; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    button:disabled { background: #94a3b8; cursor: progress; }
+    .status { margin-top: 12px; font-size: 13px; color: #64748b; min-height: 18px; }
+    .status.err { color: #b91c1c; }
+    .meta { margin: 14px 0 6px; font-size: 12px; color: #475569; }
+    ul.results { list-style: none; margin: 0; padding: 0; }
+    ul.results li { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 8px;
+                    cursor: pointer; transition: background .15s, border-color .15s; }
+    ul.results li:hover, ul.results li.active { background: #eef6fb; border-color: #0f3d5c; }
+    .rank { display: inline-block; min-width: 22px; height: 22px; line-height: 22px; text-align: center;
+            background: #0f3d5c; color: #fff; border-radius: 50%; font-size: 12px; margin-right: 8px; }
+    .name { font-weight: 600; font-size: 14px; }
+    .desc { font-size: 12px; color: #475569; margin-top: 4px; }
+    .dist { font-size: 11px; color: #0f766e; margin-top: 4px; font-weight: 600; }
+    /* --- Progress panel --- */
+    #progress { display: none; margin-top: 14px; }
+    .bar { height: 8px; background: #e2e8f0; border-radius: 5px; overflow: hidden; }
+    .bar-fill { height: 100%; width: 0; background: #0f766e; border-radius: 5px;
+                transition: width .4s ease; }
+    .prog-head { display: flex; justify-content: space-between; font-size: 12px;
+                 color: #475569; margin: 8px 0 2px; }
+    .prog-head .lbl { font-weight: 600; color: #0f3d5c; }
+    .prog-detail { font-size: 12px; color: #64748b; min-height: 16px; margin-bottom: 8px; }
+    ol.steps { list-style: none; margin: 6px 0 0; padding: 0; }
+    ol.steps li { font-size: 12px; color: #94a3b8; padding: 3px 0 3px 22px; position: relative; }
+    ol.steps li::before { content: '○'; position: absolute; left: 4px; }
+    ol.steps li.active { color: #0f3d5c; font-weight: 600; }
+    ol.steps li.active::before { content: '◑'; }
+    ol.steps li.done { color: #0f766e; }
+    ol.steps li.done::before { content: '✓'; }
+    ol.steps li .dur { color: #94a3b8; font-weight: 400; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>WalkyTalky</h1>
+    <p>Discover historical sites along your walking or cycling route.</p>
+  </header>
+
+  <div class="layout">
+    <div class="panel">
+      <label>Source</label>
+      <input id="source" placeholder="e.g. Aquarama, Kristiansand" value="Aquarama, Kristiansand" />
+      <label>Destination</label>
+      <input id="destination" placeholder="e.g. Fiskebrygga, Kristiansand" value="Fiskebrygga, Kristiansand" />
+      <div class="row">
+        <div>
+          <label>Mode</label>
+          <select id="mode">
+            <option value="walking">Walking</option>
+            <option value="cycling">Cycling</option>
+          </select>
+        </div>
+        <div>
+          <label>Radius (m)</label>
+          <input id="radius" type="number" value="1500" min="100" step="100" />
+        </div>
+      </div>
+      <label>Wikipedia URL (optional)</label>
+      <input id="wiki" placeholder="https://en.wikipedia.org/wiki/Kristiansand" />
+      <label>Tourism URL (optional)</label>
+      <input id="tourism" placeholder="https://en.visitsorlandet.com/destinations/kristiansand/" />
+      <button id="searchBtn">Search</button>
+      <div id="status" class="status"></div>
+      <div id="progress">
+        <div class="bar"><div id="barFill" class="bar-fill"></div></div>
+        <div class="prog-head">
+          <span class="lbl" id="progLabel"></span>
+          <span id="progPct"></span>
+        </div>
+        <div class="prog-detail" id="progDetail"></div>
+        <div class="prog-head"><span id="progElapsed"></span><span id="progEta"></span></div>
+        <ol class="steps" id="progSteps"></ol>
+      </div>
+      <div id="meta" class="meta"></div>
+      <ul id="results" class="results"></ul>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // --- Map setup ---------------------------------------------------------
+    const map = L.map('map').setView([58.146, 7.999], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Layers that get cleared between searches.
+    let overlay = L.layerGroup().addTo(map);
+    // Parallel arrays linking list items <-> site markers for hover highlight.
+    let siteMarkers = [];
+    let listItems = [];
+
+    /** Build a small numbered circular div icon for a site marker. */
+    function numberIcon(n, active) {
+      return L.divIcon({
+        className: '',
+        html: `<div style="background:${active ? '#b91c1c' : '#0f3d5c'};color:#fff;width:26px;height:26px;
+               border-radius:50%;display:flex;align-items:center;justify-content:center;
+               font:600 12px system-ui;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)">${n}</div>`,
+        iconSize: [26, 26], iconAnchor: [13, 13]
+      });
+    }
+
+    /** Highlight (or unhighlight) the marker + list item for a given index. */
+    function setActive(i, on) {
+      if (listItems[i]) listItems[i].classList.toggle('active', on);
+      if (siteMarkers[i]) {
+        siteMarkers[i].setIcon(numberIcon(i + 1, on));
+        if (on) siteMarkers[i].openPopup();
+      }
+    }
+
+    /** Render the API result: route line, source/dest pins, site pins + list. */
+    function render(data) {
+      overlay.clearLayers();
+      siteMarkers = [];
+      listItems = [];
+      const results = document.getElementById('results');
+      results.innerHTML = '';
+
+      // Route polyline.
+      if (data.route_points && data.route_points.length) {
+        L.polyline(data.route_points, { color: '#0f3d5c', weight: 4, opacity: .6 }).addTo(overlay);
+      }
+      // Source & destination markers.
+      const s = data.source, d = data.destination;
+      L.marker([s.lat, s.lng], { title: 'Source: ' + s.name })
+        .bindPopup('<b>Source</b><br>' + s.name).addTo(overlay);
+      L.marker([d.lat, d.lng], { title: 'Destination: ' + d.name })
+        .bindPopup('<b>Destination</b><br>' + d.name).addTo(overlay);
+
+      // Site markers + list rows.
+      data.sites.forEach((site, i) => {
+        const marker = L.marker([site.lat, site.lng], { icon: numberIcon(i + 1, false) })
+          .bindPopup(`<b>${i + 1}. ${site.name}</b><br>${site.description || ''}`)
+          .addTo(overlay);
+        marker.on('mouseover', () => setActive(i, true));
+        marker.on('mouseout', () => setActive(i, false));
+        siteMarkers.push(marker);
+
+        const li = document.createElement('li');
+        li.innerHTML = `<div><span class="rank">${i + 1}</span><span class="name">${site.name}</span></div>
+          <div class="desc">${site.description || ''}</div>
+          <div class="dist">${Math.round(site.distance_from_source_m)} m from source &middot;
+          ${Math.round(site.detour_from_route_m)} m off route</div>`;
+        li.addEventListener('mouseenter', () => setActive(i, true));
+        li.addEventListener('mouseleave', () => setActive(i, false));
+        li.addEventListener('click', () => { map.setView([site.lat, site.lng], 16); setActive(i, true); });
+        results.appendChild(li);
+        listItems.push(li);
+      });
+
+      // Fit the map to everything we drew.
+      const pts = data.route_points.concat(data.sites.map(x => [x.lat, x.lng]));
+      if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.2));
+
+      document.getElementById('meta').textContent =
+        `${data.count} site(s) within ${data.radius_m} m of the ${data.mode} route in ${data.city}.`;
+    }
+
+    // --- Progress rendering ------------------------------------------------
+    const btn = document.getElementById('searchBtn');
+    const statusEl = document.getElementById('status');
+    const progressEl = document.getElementById('progress');
+
+    /** Format a duration in seconds as "Ms Ns" or "Ns". */
+    function fmtTime(s) {
+      s = Math.max(0, Math.round(s));
+      return s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
+    }
+
+    /** Update the progress panel from a snapshot dict. */
+    function renderProgress(p) {
+      if (!p) return;
+      progressEl.style.display = 'block';
+      document.getElementById('barFill').style.width = p.percent + '%';
+      document.getElementById('progLabel').textContent =
+        `Step ${p.step_index}/${p.total_steps}: ${p.label}`;
+      document.getElementById('progPct').textContent = Math.round(p.percent) + '%';
+      document.getElementById('progDetail').textContent = p.detail || '';
+      document.getElementById('progElapsed').textContent = 'Elapsed ' + fmtTime(p.elapsed_s);
+      document.getElementById('progEta').textContent =
+        p.status === 'running' ? '~' + fmtTime(p.eta_s) + ' remaining' : '';
+      const ol = document.getElementById('progSteps');
+      ol.innerHTML = '';
+      (p.steps || []).forEach(st => {
+        const li = document.createElement('li');
+        li.className = st.state;
+        const dur = st.duration_s != null ? ` <span class="dur">(${fmtTime(st.duration_s)})</span>` : '';
+        li.innerHTML = st.label + dur;
+        ol.appendChild(li);
+      });
+    }
+
+    /** Poll the progress endpoint until the job finishes or errors. */
+    function poll(jobId) {
+      return new Promise((resolve, reject) => {
+        const tick = async () => {
+          try {
+            const resp = await fetch('/api/progress?job=' + encodeURIComponent(jobId));
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
+            renderProgress(data.progress);
+            if (data.state === 'done') return resolve(data.result);
+            if (data.state === 'error') return reject(new Error(data.error || 'Pipeline failed'));
+            setTimeout(tick, 1000);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        tick();
+      });
+    }
+
+    // --- Search handler ----------------------------------------------------
+    btn.addEventListener('click', async () => {
+      const body = {
+        source: document.getElementById('source').value,
+        destination: document.getElementById('destination').value,
+        mode: document.getElementById('mode').value,
+        radius: document.getElementById('radius').value,
+        wiki: document.getElementById('wiki').value,
+        tourism: document.getElementById('tourism').value,
+      };
+      if (!body.source || !body.destination) {
+        statusEl.textContent = 'Please enter both a source and a destination.';
+        statusEl.className = 'status err';
+        return;
+      }
+      btn.disabled = true;
+      statusEl.className = 'status';
+      statusEl.textContent = 'Starting…';
+      document.getElementById('meta').textContent = '';
+      document.getElementById('results').innerHTML = '';
+      try {
+        const resp = await fetch('/api/search', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
+        statusEl.textContent = '';
+        const result = await poll(data.job_id);
+        progressEl.style.display = 'none';
+        render(result);
+        if (!result.sites.length) statusEl.textContent = 'No historical sites found in the corridor.';
+      } catch (err) {
+        progressEl.style.display = 'none';
+        statusEl.className = 'status err';
+        statusEl.textContent = 'Error: ' + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

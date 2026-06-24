@@ -1,0 +1,22 @@
+- Use ollama embedding, ollama language model
+
+- Given a source and destination via a Google Maps Link
+
+e.g. 
+Walking > google.com/maps/dir/Aquarama,+Tangen+8,+4608+Kristiansand/Fish+Market,+Gravane+6,+4610+Kristiansand/@58.1442789,7.995064,16z/data=!3m1!4b1!4m14!4m13!1m5!1m1!1s0x463802432f5ac43f:0xbc291747cbcc0167!2m2!1d8.0058176!2d58.1468586!1m5!1m1!1s0x46380266d1eed733:0x59b9c0c0e0cc30de!2m2!1d7.9948058!2d58.1410961!3e2?entry=ttu&g_ep=EgoyMDI2MDYxNi4wIKXMDSoASAFQAw%3D%3D
+Cycling > google.com/maps/dir/Aquarama,+Tangen+8,+4608+Kristiansand/Fish+Market,+Gravane+6,+4610+Kristiansand/@58.1442789,7.995064,16z/data=!4m14!4m13!1m5!1m1!1s0x463802432f5ac43f:0xbc291747cbcc0167!2m2!1d8.0058176!2d58.1468586!1m5!1m1!1s0x46380266d1eed733:0x59b9c0c0e0cc30de!2m2!1d7.9948058!2d58.1410961!3e1?entry=ttu&g_ep=EgoyMDI2MDYxNi4wIKXMDSoASAFQAw%3D%3D
+
+- also given wikipedia page link
+e.g.
+https://en.wikipedia.org/wiki/Kristiansand
+
+- also given official tourism webpage 
+e.g.
+https://en.visitsorlandet.com/destinations/kristiansand/
+
+- Identify and extract location details from Maps. 
+
+- Using the page links and location details identify locations of historical interest withing a radius of the given locations.
+
+- Output a list of locations ordered by distance from source. 
+
