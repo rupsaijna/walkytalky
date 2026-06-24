@@ -4,6 +4,25 @@ All implementation changes are logged here, newest first. (Requested: "log all c
 
 ## 2026-06-24
 
+### Static cached mode for GitHub Pages (+ extraction resilience)
+- The web UI is a client+server app; a static host (GitHub Pages) has no backend,
+  so live search there returned an HTML 404 that the page tried to parse as JSON
+  ("Unexpected token '<'"). Added a backend-free **cached mode**:
+  - `index.html` probes `GET /api/health`; with no backend it switches to cached
+    mode — shows a banner, disables live-search inputs, and offers a **Cached
+    examples** dropdown loaded from a committed manifest. An `asJson()` helper
+    turns any non-JSON response into a clear message instead of a parse error.
+  - `server.py` gains `GET /api/health` (`{"ok": true, "mode": "full"}`).
+  - `export_cache.py` (new) writes `web_cache/` (manifest `index.json` + one file
+    per route) from the on-disk result cache, so only actually-computed routes are
+    published — an honest snapshot. Exported the two Kristiansand routes.
+  - README documents the full-vs-cached modes and how to publish the demo.
+  - Verified static serving (no `/api`): health 404 → cached mode; manifest and
+    route files load 200.
+- Extraction resilience: a single batch that errors (e.g. an Ollama `ReadTimeout`
+  on the CPU-bound model — which aborted a full run) is now caught and skipped
+  with a warning, so other batches still contribute instead of failing the run.
+
 ### Geocoder — LLM-driven local-language name normalization (generalised)
 - Replaced the hard-coded English->Norwegian feature-word table with a general
   `extract.localize_names(city, names)`: one LLM call renders every extracted

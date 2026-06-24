@@ -41,6 +41,11 @@
     .name { font-weight: 600; font-size: 14px; }
     .desc { font-size: 12px; color: #475569; margin-top: 4px; }
     .dist { font-size: 11px; color: #0f766e; margin-top: 4px; font-weight: 600; }
+    .banner { display: none; font-size: 12px; line-height: 1.4; padding: 10px;
+              border-radius: 6px; margin-bottom: 12px; }
+    .banner.cached { display: block; background: #fef3c7; border: 1px solid #f59e0b; color: #78350f; }
+    .banner code { background: #00000010; padding: 1px 4px; border-radius: 3px; }
+    hr.sep { border: 0; border-top: 1px solid #e2e8f0; margin: 14px 0 2px; }
     /* --- Progress panel --- */
     #progress { display: none; margin-top: 14px; }
     .bar { height: 8px; background: #e2e8f0; border-radius: 5px; overflow: hidden; }
@@ -68,6 +73,10 @@
 
   <div class="layout">
     <div class="panel">
+      <div id="banner" class="banner"></div>
+      <label>Cached examples</label>
+      <select id="cached"><option value="">— select a precomputed city —</option></select>
+      <hr class="sep" />
       <label>Source</label>
       <input id="source" placeholder="e.g. Aquarama, Kristiansand" value="Aquarama, Kristiansand" />
       <label>Destination</label>
@@ -243,7 +252,17 @@
       });
     }
 
-    // --- Search handler ----------------------------------------------------
+    /** Parse a fetch response as JSON, with a clear message if it's HTML. */
+    async function asJson(resp) {
+      const text = await resp.text();
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        throw new Error('Expected JSON but got a non-JSON response (no backend?).');
+      }
+    }
+
+    // --- Search handler (full mode only) -----------------------------------
     btn.addEventListener('click', async () => {
       const body = {
         source: document.getElementById('source').value,
@@ -268,7 +287,7 @@
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         });
-        const data = await resp.json();
+        const data = await asJson(resp);
         if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
         statusEl.textContent = '';
         const result = await poll(data.job_id);
@@ -283,6 +302,80 @@
         btn.disabled = false;
       }
     });
+
+    // --- Cached examples + mode detection ----------------------------------
+    const cachedSel = document.getElementById('cached');
+    const bannerEl = document.getElementById('banner');
+
+    /** Load and render a precomputed result from the static web_cache/. */
+    async function loadCached(file) {
+      statusEl.className = 'status';
+      statusEl.textContent = 'Loading cached result…';
+      try {
+        const resp = await fetch('web_cache/' + file);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await asJson(resp);
+        statusEl.textContent = '';
+        render(data);
+        if (!data.sites.length) statusEl.textContent = 'No historical sites in this cached corridor.';
+      } catch (err) {
+        statusEl.className = 'status err';
+        statusEl.textContent = 'Could not load cached result: ' + err.message;
+      }
+    }
+    cachedSel.addEventListener('change', () => {
+      if (cachedSel.value) loadCached(cachedSel.value);
+    });
+
+    /** Populate the cached-examples dropdown from the committed manifest. */
+    async function loadManifest() {
+      try {
+        const resp = await fetch('web_cache/index.json');
+        if (!resp.ok) return false;
+        const data = await asJson(resp);
+        (data.routes || []).forEach(r => {
+          const opt = document.createElement('option');
+          opt.value = r.file;
+          opt.textContent = `${r.city}: ${r.source} → ${r.destination} (${r.mode}, ${r.count} sites)`;
+          cachedSel.appendChild(opt);
+        });
+        return (data.routes || []).length > 0;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    /** Detect whether the live pipeline backend is present. */
+    async function hasBackend() {
+      try {
+        const resp = await fetch('/api/health');
+        if (!resp.ok) return false;
+        const data = await asJson(resp);
+        return !!data.ok;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    (async function init() {
+      const haveCached = await loadManifest();
+      const backend = await hasBackend();
+      if (!backend) {
+        // Static / cached-only deployment (e.g. GitHub Pages).
+        bannerEl.className = 'banner cached';
+        bannerEl.innerHTML = haveCached
+          ? '📦 <b>Cached demo mode.</b> This static site shows only precomputed cities — pick one above. '
+            + 'For live search of any route, run <code>python server.py</code> and open '
+            + '<code>localhost:8000</code>.'
+          : '📦 <b>Cached demo mode</b>, but no cached results were found. '
+            + 'Run <code>python server.py</code> locally for live search.';
+        btn.disabled = true;
+        btn.textContent = 'Live search needs the local server';
+        ['source','destination','mode','radius','wiki','tourism'].forEach(id => {
+          document.getElementById(id).disabled = true;
+        });
+      }
+    })();
   </script>
 </body>
 </html>

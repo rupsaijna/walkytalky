@@ -94,7 +94,38 @@ the matching list row and vice versa**, and clicking a row zooms to it.
 
 Under the hood the UI is job-based: `POST /api/search` starts the pipeline on a
 background thread and returns a `job_id`; the page polls
-`GET /api/progress?job=<id>` once a second for the snapshot and final result. The map uses Leaflet + OpenStreetMap (no API key); to
+`GET /api/progress?job=<id>` once a second for the snapshot and final result.
+
+### Two deployment modes
+
+The same `index.html` runs in two modes and detects which one it's in (it probes
+`GET /api/health`):
+
+| | **Full (Python server)** | **Cached (static host, e.g. GitHub Pages)** |
+|---|---|---|
+| How | `python server.py` → `localhost:8000` | static files only — no backend |
+| Live free-text search | ✅ runs the full RAG pipeline | ❌ disabled (shown as a banner) |
+| Cached cities | ✅ available | ✅ the only option |
+| Needs Ollama | yes | no |
+
+**The full pipeline cannot run on GitHub Pages** — it needs the Python backend
+and a local Ollama (plus OSRM/Nominatim/web-search calls), none of which a static
+host provides. So the published static site is a **cached demo**: it serves only
+precomputed results and says so. Pick a city from the **Cached examples**
+dropdown to view its route and sites.
+
+#### Publishing the cached demo
+
+1. Compute the routes you want to publish (CLI or web UI) so they land in the
+   result cache.
+2. Export them to the committed static dataset:
+   ```
+   python export_cache.py        # writes web_cache/ (index.json + one file per route)
+   ```
+3. Commit `web_cache/` and enable **GitHub Pages → Deploy from branch → main / root**.
+
+Only the routes you actually computed are exported, so the demo is an honest
+snapshot. To add more cities, compute them and re-run `export_cache.py`. The map uses Leaflet + OpenStreetMap (no API key); to
 use Google Maps instead, swap the tile layer for the Google Maps JavaScript API
 (requires a billing-enabled key).
 

@@ -134,6 +134,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802 - required name from BaseHTTPRequestHandler
         """Serve the progress API, ``index.html`` at ``/``, and static files."""
         path = self.path.split("?", 1)[0]
+        if path == "/api/health":
+            # Presence probe: lets the UI tell "full" (server) mode from the
+            # static cached-only build (e.g. GitHub Pages), where this 404s.
+            self._send_json(200, {"ok": True, "mode": "full"})
+            return
         if path == "/api/progress":
             self._handle_progress()
             return

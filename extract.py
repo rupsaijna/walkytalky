@@ -223,12 +223,21 @@ def extract_sites(store, city, k=RETRIEVE_K):
         return []
 
     # Extract from each batch and union, deduping by lowercased name. First
-    # occurrence wins (it carries the highest-ranked context for that name).
+    # occurrence wins (it carries the highest-ranked context for that name). A
+    # batch that errors (e.g. an Ollama timeout on the CPU-bound model) is
+    # skipped rather than aborting the whole extraction.
     deduped = {}
-    for start in range(0, len(pooled), MAX_CONTEXT_CHUNKS):
+    n_batches = (len(pooled) + MAX_CONTEXT_CHUNKS - 1) // MAX_CONTEXT_CHUNKS
+    for bi, start in enumerate(range(0, len(pooled), MAX_CONTEXT_CHUNKS), 1):
         batch = pooled[start:start + MAX_CONTEXT_CHUNKS]
         context = "\n\n".join(batch)
-        for s in _extract_from_context(city, context):
+        try:
+            sites = _extract_from_context(city, context)
+        except Exception as exc:  # noqa: BLE001 - one slow/failed batch is not fatal
+            print(f"      WARN: extraction batch {bi}/{n_batches} failed "
+                  f"({type(exc).__name__}); skipping.")
+            continue
+        for s in sites:
             if not isinstance(s, dict):
                 continue
             name = str(s.get("name", "")).strip()
