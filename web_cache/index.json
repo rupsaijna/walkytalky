@@ -8,17 +8,7 @@
       "radius_m": 1500.0,
       "source": "Aquarama, Kristiansand",
       "destination": "Fiskebrygga, Kristiansand",
-      "count": 3
-    },
-    {
-      "id": "kristiansand-walking-78be1c41",
-      "file": "kristiansand-walking-78be1c41.json",
-      "city": "Kristiansand",
-      "mode": "walking",
-      "radius_m": 1500.0,
-      "source": "Aquarama, Tangen 8, 4608 Kristiansand",
-      "destination": "Fish Market, Gravane 6, 4610 Kristiansand",
-      "count": 2
+      "count": 5
     }
   ]
 }

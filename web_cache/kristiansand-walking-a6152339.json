@@ -212,8 +212,16 @@
       7.995041
     ]
   ],
-  "count": 3,
+  "count": 5,
   "sites": [
+    {
+      "name": "Christiansholm Fortress",
+      "description": "A historic fortress built in 1672 to guard Kristiansand’s Eastern Harbour",
+      "lat": 58.1441303,
+      "lng": 8.0034282,
+      "detour_from_route_m": 187.8,
+      "distance_from_source_m": 353.8
+    },
     {
       "name": "Posebyen",
       "description": "Historical working class housing area with unique architectural features like gossip mirrors and diagonal doors",
@@ -221,6 +229,14 @@
       "lng": 7.9982364,
       "detour_from_route_m": 418.8,
       "distance_from_source_m": 560.9
+    },
+    {
+      "name": "Nupen Fountains",
+      "description": "Sculptural fountains commemorating the 350th anniversary of Kristiansand's founding",
+      "lat": 58.1428156,
+      "lng": 7.9993631,
+      "detour_from_route_m": 111.0,
+      "distance_from_source_m": 618.2
     },
     {
       "name": "Odderøya Museum Harbour",
