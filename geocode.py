@@ -220,6 +220,42 @@ def geocode(name, city="", viewbox=None, cache=None, timeout=20, aliases=None):
     return result
 
 
+def reverse_city(lat, lng, timeout=20):
+    """Reverse-geocode a coordinate to its city/town/locality name via Nominatim.
+
+    This is robust to how a free-text source was phrased: deriving the city from
+    the *name* (e.g. "Kristiansand kathedral") can yield a non-city string that
+    then poisons discovery/geocoding, whereas the coordinate's actual address
+    components are authoritative.
+
+    Args:
+        lat: Latitude in degrees.
+        lng: Longitude in degrees.
+        timeout: HTTP timeout in seconds.
+
+    Returns:
+        str: The locality name (city/town/village/...), or ``""`` on any failure.
+    """
+    params = {"lat": lat, "lon": lng, "format": "json", "addressdetails": 1,
+              "zoom": 14}
+    _rate_limit()
+    try:
+        resp = requests.get(
+            f"{NOMINATIM_BASE}/reverse",
+            params=params,
+            headers={"User-Agent": USER_AGENT},
+            timeout=timeout,
+        )
+        resp.raise_for_status()
+        addr = resp.json().get("address", {}) or {}
+    except Exception:  # noqa: BLE001 - best-effort; caller falls back
+        return ""
+    for key in ("city", "town", "village", "municipality", "suburb", "county"):
+        if addr.get(key):
+            return str(addr[key]).strip()
+    return ""
+
+
 def geocode_sites(sites, city="", viewbox=None):
     """Geocode a list of site dicts in place, sharing one cache.
 

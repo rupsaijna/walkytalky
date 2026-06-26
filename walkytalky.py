@@ -161,7 +161,14 @@ def run_from_query(source, destination, mode="walking", wiki_url="", tourism_url
         raise ValueError(f"Could not geocode destination: {destination!r}")
     src = {"name": source, "lat": s[0], "lng": s[1]}
     dst = {"name": destination, "lat": d[0], "lng": d[1]}
-    city = city_override or maps_parser.derive_city({"name": source}) or source
+    # Derive the city robustly: reverse-geocode the source coordinate (immune to
+    # how the source was phrased), then fall back to name-based parsing of the
+    # source or destination, and finally the raw source string.
+    city = (city_override
+            or geocode.reverse_city(s[0], s[1])
+            or maps_parser.derive_city({"name": source})
+            or maps_parser.derive_city({"name": destination})
+            or source)
     tracker.note(f"{source}  ->  {destination}  ({mode}, city: {city})")
     return run_pipeline(src, dst, mode, city, wiki_url, tourism_url, radius_m,
                         out_path, refresh=refresh, tracker=tracker)

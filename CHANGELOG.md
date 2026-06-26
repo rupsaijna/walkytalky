@@ -2,6 +2,25 @@
 
 All implementation changes are logged here, newest first. (Requested: "log all changes in a file.")
 
+## 2026-06-26
+
+### Robust city derivation (reverse-geocode) + cache dedup tool
+- Free-text web searches derived the city from the source *name*'s last
+  comma-separated token, so a comma-less source like "Kristiansand kathedral"
+  yielded the junk city "Kristiansand kathedral" — which poisoned discovery
+  searches, the geocoding city-qualifier and `localize_names`, returning 0 sites
+  (caught during verification). Fix: `geocode.reverse_city(lat, lng)` reverse-
+  geocodes the source coordinate via Nominatim (`addressdetails`) to the real
+  locality. `run_from_query` now prefers it, falling back to name-based parsing
+  of the source, then the destination, then the raw source string.
+  Verified: the cathedral/Aquarama/Fiskebrygga coordinates all resolve to
+  "Kristiansand".
+- `cache_dedupe.py` (new): reports and (with `--apply`) fixes cache redundancy —
+  drops empty results (count 0), merges duplicate-route files (same
+  city/mode/radius + nearby endpoints) unioning their sites, de-dups sites within
+  a result, and reports geocode keys sharing coordinates. Applied: 3 cached
+  results -> 1 merged Kristiansand walking result (5 sites).
+
 ## 2026-06-24
 
 ### Static cached mode for GitHub Pages (+ extraction resilience)
