@@ -1,0 +1,21 @@
+#!/bin/sh
+# WalkyTalky pre-commit hook.
+#
+# Regenerates the static cached dataset (web_cache/) from the local result cache
+# and stages it, so every commit — and therefore every push — carries the latest
+# cached results without a manual `python export_cache.py`.
+#
+# Enabled via:  git config core.hooksPath hooks
+# Never blocks a commit: if export fails (e.g. no Python on PATH), it warns and
+# lets the commit proceed.
+
+PY=python
+command -v "$PY" >/dev/null 2>&1 || PY=python3
+
+if "$PY" export_cache.py >/dev/null 2>&1; then
+    git add -A web_cache 2>/dev/null
+else
+    echo "pre-commit: export_cache.py failed; committing without refreshing web_cache/" >&2
+fi
+
+exit 0

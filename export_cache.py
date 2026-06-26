@@ -39,6 +39,14 @@ def export():
         return 0
 
     os.makedirs(WEB_CACHE_DIR, exist_ok=True)
+    # Clear previously-exported JSON so the published set stays in sync with the
+    # current cache (drops routes that are no longer cached).
+    for old in os.listdir(WEB_CACHE_DIR):
+        if old.endswith(".json"):
+            try:
+                os.remove(os.path.join(WEB_CACHE_DIR, old))
+            except OSError:
+                pass
     manifest = []
     for fname in sorted(os.listdir(src_dir)):
         if not fname.endswith(".json"):

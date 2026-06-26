@@ -125,7 +125,25 @@ dropdown to view its route and sites.
 3. Commit `web_cache/` and enable **GitHub Pages → Deploy from branch → main / root**.
 
 Only the routes you actually computed are exported, so the demo is an honest
-snapshot. To add more cities, compute them and re-run `export_cache.py`. The map uses Leaflet + OpenStreetMap (no API key); to
+snapshot. To add more cities, compute them and re-run `export_cache.py`.
+
+#### Keeping the published cache in sync automatically
+
+A tracked **pre-commit hook** (`hooks/pre-commit`) regenerates `web_cache/` from
+your local result cache and stages it on every commit, so a new run's results
+reach GitHub the next time you push — no manual export. Enable it once per clone:
+
+```
+git config core.hooksPath hooks
+```
+
+The hook never blocks a commit; if `export_cache.py` can't run it just warns and
+proceeds. To publish a cache-only update with no other changes:
+
+```
+git commit -m "update cached results" --allow-empty   # hook stages web_cache/
+git push
+``` The map uses Leaflet + OpenStreetMap (no API key); to
 use Google Maps instead, swap the tile layer for the Google Maps JavaScript API
 (requires a billing-enabled key).
 
